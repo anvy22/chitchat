@@ -1,0 +1,317 @@
+@import "tailwindcss";
+
+@theme {
+  /* ─── Surface / Background (Light Mode) ─── */
+  --color-surface-base: #F8F9FA;
+  --color-surface: #FFFFFF;
+  --color-surface-dim: #E2E8F0;
+  --color-surface-bright: #FFFFFF;
+  --color-surface-lowest: #FFFFFF;
+  --color-surface-low: #F1F5F9;
+  --color-surface-container: #E2E8F0;
+  --color-surface-high: #CBD5E1;
+  --color-surface-highest: #94A3B8;
+
+  /* ─── Text (Light Mode) ─── */
+  --color-on-surface: #0F172A;
+  --color-on-surface-variant: #334155;
+  --color-on-surface-muted: #64748B;
+  
+  /* ─── Inverted / High Contrast (for items that were previously 'text-white') ─── */
+  --color-inverse-surface: #0F172A;
+  --color-on-inverse-surface: #FFFFFF;
+
+  /* ─── Primary (Purple) ─── */
+  --color-primary: #6D3BD7;
+  --color-primary-dim: #5c32b5;
+  --color-on-primary: #FFFFFF;
+  --color-primary-container: #E9DDFF;
+  --color-on-primary-container: #23005C;
+  --color-primary-fixed: #E9DDFF;
+  --color-on-primary-fixed: #23005C;
+  --color-inverse-primary: #D0BCFF;
+
+  /* ─── Secondary (Blue) ─── */
+  --color-secondary: #0566D9;
+  --color-on-secondary: #FFFFFF;
+  --color-secondary-container: #D8E2FF;
+  --color-on-secondary-container: #001A42;
+
+  /* ─── Tertiary (Green) ─── */
+  --color-tertiary: #00A572;
+  --color-on-tertiary: #FFFFFF;
+  --color-tertiary-container: #A4F5D0;
+  --color-on-tertiary-container: #00311F;
+
+  /* ─── Accent / Border ─── */
+  --color-outline: #CBD5E1;
+  --color-outline-variant: #E2E8F0;
+  --color-outline-focus: #94A3B8;
+
+  /* ─── Danger ─── */
+  --color-error: #BA1A1A;
+  --color-on-error: #FFFFFF;
+  --color-error-container: #FFDAD6;
+  --color-on-error-container: #410002;
+
+  /* ─── Fonts ─── */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.dark {
+  /* ─── Surface / Background (Dark Mode) ─── */
+  --color-surface-base: #080707;
+  --color-surface: #2F2F2F;
+  --color-surface-dim: #171717;
+  --color-surface-bright: #363636;
+  --color-surface-lowest: #0A0A0A;
+  --color-surface-low: #121212;
+  --color-surface-container: #1F1F1F;
+  --color-surface-high: #424242;
+  --color-surface-highest: #505050;
+
+  /* ─── Text (Dark Mode) ─── */
+  --color-on-surface: #ECECEC;
+  --color-on-surface-variant: #D1D5DB;
+  --color-on-surface-muted: #B4B4B4;
+
+  /* ─── Accent / Border ─── */
+  --color-outline: #303030;
+  --color-outline-variant: #262626;
+  --color-outline-focus: #505050;
+
+  color-scheme: dark;
+}
+
+/* ─── Base Styles ─── */
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-surface-base);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Custom Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline-focus);
+}
+
+/* ─── Glass Panels (Light Theme) ─── */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.dark .glass-panel {
+  background: rgba(33, 33, 33, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Level 2 Panel */
+.glass-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+}
+.dark .glass-card {
+  background: rgba(33, 33, 33, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(109, 59, 215, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), 0 0 10px rgba(109, 59, 215, 0.05);
+}
+.dark .glass-card:hover {
+  background: rgba(47, 47, 47, 0.8);
+}
+
+.glass-card-static {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+.dark .glass-card-static {
+  background: rgba(33, 33, 33, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modal-shadow {
+  box-shadow: 0px 20px 40px rgba(0,0,0,0.08);
+}
+
+/* ─── Custom Buttons ─── */
+.btn-gradient {
+  background: linear-gradient(135deg, var(--color-primary), #4c29c6);
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.btn-gradient:hover {
+  box-shadow: 0 4px 12px rgba(109, 59, 215, 0.2);
+}
+
+.btn-gradient:hover::after {
+  opacity: 1;
+}
+
+/* ─── Animations ─── */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-surface-dim);
+}
+
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(109, 59, 215, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(109, 59, 215, 0); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Status Rings */
+.status-ring-online { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-tertiary); }
+.status-ring-busy { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-error); }
+.status-ring-away { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px #F59E0B; }
+
+/* Avatar Walking Animations (Gather Style) */
+@keyframes gather-wobble {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(-3deg) translateY(-2px); }
+  75% { transform: rotate(3deg) translateY(-2px); }
+}
+
+@keyframes arm-swing-left {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(30deg); }
+  75% { transform: rotate(-30deg); }
+}
+
+@keyframes arm-swing-right {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-30deg); }
+  75% { transform: rotate(30deg); }
+}
+
+@keyframes leg-step-left {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-4px); }
+}
+
+@keyframes leg-step-right {
+  0%, 100% { transform: translateY(0); }
+  75% { transform: translateY(-4px); }
+}
+
+@keyframes shadow-squish {
+  0%, 100% { transform: scaleX(1); opacity: 0.3; }
+  50% { transform: scaleX(1.3); opacity: 0.2; }
+}
+
+.animate-gather-wobble {
+  animation: gather-wobble 0.4s ease-in-out infinite;
+}
+
+.animate-arm-swing-left {
+  animation: arm-swing-left 0.4s ease-in-out infinite;
+}
+
+.animate-arm-swing-right {
+  animation: arm-swing-right 0.4s ease-in-out infinite;
+}
+
+.animate-leg-step-left {
+  animation: leg-step-left 0.4s ease-in-out infinite;
+}
+
+.animate-leg-step-right {
+  animation: leg-step-right 0.4s ease-in-out infinite;
+}
+
+.animate-shadow-squish {
+  animation: shadow-squish 0.4s ease-in-out infinite;
+}
+
+/* ─── Avatar State Styles ─────────────────────────────────────────── */
+
+.avatar-sitting {
+  animation: none !important;
+  transform: none !important;
+}
+
+@keyframes swim-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.avatar-swimming {
+  animation: swim-bob 1.2s ease-in-out infinite !important;
+  filter: brightness(0.9) saturate(1.2);
+}
