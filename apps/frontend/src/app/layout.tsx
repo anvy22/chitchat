@@ -9,11 +9,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "OrbitHQ — Virtual Spaces with Proximity Interaction",
+  title: "ChitChat — Virtual Spaces for collaboration",
   description: "Step into a digital headquarters where conversations flow naturally. Move your avatar close to others, collaborate in real-time, and build custom environments.",
 };
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/lib/AuthContext";
 
 export default function RootLayout({
   children,
@@ -24,7 +25,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <QueryProvider>{children}</QueryProvider>
+          <AuthProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,9 +1,12 @@
 "use client";
 
 import { cn, getStatusColor } from "@/lib/utils";
+import { AvatarCharacter } from "@/components/avatar/avatar-character";
+import type { AvatarConfig } from "@/types";
 
 interface AvatarProps {
   initials: string;
+  avatarConfig?: AvatarConfig;
   status?: "online" | "away" | "busy" | "offline";
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -15,17 +18,34 @@ const sizeClasses = {
   lg: "w-14 h-14 text-lg",
 };
 
-export function Avatar({ initials, status, size = "md", className }: AvatarProps) {
+const characterSizeMap = {
+  sm: "xs" as const,
+  md: "xs" as const,
+  lg: "sm" as const,
+};
+
+export function Avatar({ initials, avatarConfig, status, size = "md", className }: AvatarProps) {
   return (
     <div className={cn("relative inline-flex", className)}>
-      <div
-        className={cn(
-          "rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-semibold text-white",
-          sizeClasses[size]
-        )}
-      >
-        {initials}
-      </div>
+      {avatarConfig ? (
+        <div
+          className={cn(
+            "rounded-full bg-surface-high/60 flex items-center justify-center overflow-hidden",
+            sizeClasses[size]
+          )}
+        >
+          <AvatarCharacter config={avatarConfig} size={characterSizeMap[size]} showShadow={false} />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-semibold text-white",
+            sizeClasses[size]
+          )}
+        >
+          {initials}
+        </div>
+      )}
       {status && status !== "offline" && (
         <span
           className={cn(
