@@ -39,7 +39,7 @@ export async function fetchSpaces(): Promise<Space[]> {
   }
 }
 
-export async function fetchSpaceById(id: string): Promise<Space | undefined> {
+export async function fetchSpaceById(id: string): Promise<Space> {
   await sleep(200);
 
   try {
@@ -62,7 +62,7 @@ export async function fetchSpaceById(id: string): Promise<Space | undefined> {
     console.error("Failed to load space", error);
   }
 
-  return undefined;
+  throw new Error(`Space "${id}" not found`);
 }
 
 export async function deleteSpace(id: string): Promise<void> {

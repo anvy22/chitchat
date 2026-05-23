@@ -80,6 +80,13 @@ export interface Asset {
   height: number;
   /** Default actions for all instances of this asset (can be overridden per element). */
   defaultActions?: ElementAction[];
+  /**
+   * Collision behavior. Defaults are inferred from category if omitted:
+   * - "solid"  → full AABB collision (furniture, interactive)
+   * - "partial"→ collision uses only the bottom portion of the tile (trees)
+   * - "none"   → walk-through (zones, small decorations, walkable floors)
+   */
+  collision?: "solid" | "partial" | "none";
 }
 
 export interface TeamMember extends User {
@@ -88,14 +95,46 @@ export interface TeamMember extends User {
   spacesCount: number;
 }
 
+export type HairStyle = 'crew-cut' | 'medium' | 'long' | 'curly' | 'ponytail' | 'bun' | 'bald';
+export type OutfitType = 'tshirt' | 'hoodie' | 'suit' | 'dress' | 'tank-top';
+export type OutfitPattern = 'solid' | 'stripes' | 'dots' | 'checkered' | 'camo';
+export type AccessoryType = 'none' | 'glasses' | 'headphones' | 'hat' | 'earrings' | 'mask';
+export type EyeShape = 'normal' | 'squint' | 'wide' | 'cool';
+export type MouthType = 'smile' | 'neutral' | 'surprised' | 'cool';
+export type FacialHair = 'none' | 'beard' | 'mustache' | 'stubble';
+export type FaceShape = 'oval' | 'round' | 'square' | 'heart';
+
 export interface AvatarConfig {
   skinTone: string;
-  hairStyle: string;
+  faceShape: FaceShape;
+  hairStyle: HairStyle;
   hairColor: string;
-  outfit: string;
+  facialHair: FacialHair;
+  outfit: OutfitType;
+  outfitPattern: OutfitPattern;
   outfitColor: string;
-  accessory: string;
+  accessory: AccessoryType;
+  eyeColor: string;
+  eyeShape: EyeShape;
+  mouth: MouthType;
+  photoUrl?: string;            // Future: uploaded photo for AI avatar generation
+  generatedFromPhoto?: boolean; // Future: flag to indicate AI-generated config
 }
+
+export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
+  skinTone: '#E8A87C',
+  faceShape: 'oval',
+  hairStyle: 'medium',
+  hairColor: '#4A2F1D',
+  facialHair: 'none',
+  outfit: 'tshirt',
+  outfitPattern: 'solid',
+  outfitColor: '#6D3BD7',
+  accessory: 'none',
+  eyeColor: '#1E293B',
+  eyeShape: 'normal',
+  mouth: 'smile',
+};
 
 export interface PlacedElement {
   id: string;

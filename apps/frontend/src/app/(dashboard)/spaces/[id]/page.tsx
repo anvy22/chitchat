@@ -18,13 +18,9 @@ import {
   Maximize,
   Minimize,
 } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSpace, useMessages, useAssets, useCanvasData } from "@/hooks/use-queries";
-import { formatRelativeTime } from "@/lib/utils";
+import { useSpace, useMessages, useAssets, useCanvasData, useAuthUser, useAvatarConfig } from "@/hooks/use-queries";
+import { AvatarCharacter } from "@/components/avatar/avatar-character";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { TopDownAssetRenderer } from "@/components/editor/top-down-asset-renderer";
@@ -34,8 +30,12 @@ import type { BackgroundTheme, AvatarState, ElementAction, PlacedElement, Asset 
 
 const GRID_SIZE = 40;
 const AVATAR_SIZE = 32;
-const MOVE_SPEED = 3;
+const MOVE_SPEED = 4.5;
 const PROXIMITY_RANGE = 60; // pixels — how close the avatar must be to interact
+
+// Collision hitbox size (centered on avatar's lower body / feet area)
+const HITBOX_W = 10;
+const HITBOX_H = 8;
 
 /** Get the actions for a placed element (per-instance overrides or asset defaults). */
 function getElementActions(el: PlacedElement, asset: Asset | undefined): ElementAction[] {
@@ -93,21 +93,29 @@ export default function SpaceRoomPage() {
   const { data: canvasData, isLoading: canvasLoading } = useCanvasData(spaceId);
   const { data: assets } = useAssets();
   const { data: messages, isLoading: messagesLoading } = useMessages(spaceId);
+  const { data: user } = useAuthUser();
+  const { data: avatarConfig } = useAvatarConfig();
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
 
-  // Avatar position in pixels
-  const [avatarPos, setAvatarPos] = useState({ x: 200, y: 200 });
+  // Avatar position — use refs for the game loop, sync to state at a throttled rate
+  const [avatarPos, setAvatarPos] = useState({ x: 800, y: 800 });
   const [facing, setFacing] = useState<'down'|'up'|'left'|'right'>('down');
   const [isMoving, setIsMoving] = useState(false);
+  const posRef = useRef({ x: 800, y: 800 });
+  const facingRef = useRef<'down'|'up'|'left'|'right'>('down');
+  const movingRef = useRef(false);
   const keysPressed = useRef<Set<string>>(new Set());
   const animationRef = useRef<number | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [camera, setCamera] = useState({ x: 0, y: 0 });
+  const lastSyncRef = useRef(0);
 
   // ─── Interaction System State ───────────────────────────────────────
   const [avatarState, setAvatarState] = useState<AvatarState>('idle');
+  const avatarStateRef = useRef<AvatarState>(avatarState);
+  avatarStateRef.current = avatarState;
   const [nearbyElement, setNearbyElement] = useState<{ el: PlacedElement; asset: Asset; actions: ElementAction[] } | null>(null);
   const [sittingOnId, setSittingOnId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -144,11 +152,13 @@ export default function SpaceRoomPage() {
         // Snap avatar to element center and enter sitting state
         const seatX = el.x * GRID_SIZE + (asset.width * GRID_SIZE) / 2 - AVATAR_SIZE / 2;
         const seatY = el.y * GRID_SIZE + (asset.height * GRID_SIZE) / 2 - AVATAR_SIZE / 2;
+        posRef.current = { x: seatX, y: seatY };
         setAvatarPos({ x: seatX, y: seatY });
         setAvatarState('sitting');
         setSittingOnId(el.id);
         sittingOnIdRef.current = el.id;
         lastSittingOnIdRef.current = el.id;
+        movingRef.current = false;
         setIsMoving(false);
         break;
       }
@@ -206,99 +216,150 @@ export default function SpaceRoomPage() {
     };
   }, [avatarState, nearbyElement, handleAction]);
 
-  // Game loop
+  // Game loop — uses refs for position to avoid setState on every frame
   useEffect(() => {
     const placedElements = canvasData?.elements || [];
 
-    const loop = () => {
+    // Build an AABB at the avatar's feet area for collision.
+    // The avatar container stacks: name-tag (~18px) + character (~44px) + shadow (~10px).
+    // We place the hitbox at the bottom of the character (feet), not the torso center.
+    const getBodyRect = (posX: number, posY: number) => {
+      const NAME_TAG_H = 18;
+      const CHAR_H = 44;
+      const centerX = posX + AVATAR_SIZE / 2;
+      const feetY = posY + NAME_TAG_H + CHAR_H; // bottom of character
+      return {
+        left: centerX - HITBOX_W / 2,
+        right: centerX + HITBOX_W / 2,
+        top: feetY - HITBOX_H,
+        bottom: feetY,
+      };
+    };
+
+    /** Resolve the effective collision mode for an asset. */
+    const getCollisionMode = (asset: Asset): "solid" | "partial" | "none" => {
+      if (asset.collision) return asset.collision;
+      // Default inference from category
+      if (asset.category === "zone") return "none";
+      if (asset.category === "decoration") {
+        // Large decorations (2x2+) default to partial (tree-like trunk collision)
+        if (asset.width >= 2 && asset.height >= 2) return "partial";
+        // Small 1x1 decorations (plants, pots) are walkable
+        return "none";
+      }
+      // furniture & interactive default to solid
+      return "solid";
+    };
+
+    const isInside = (posX: number, posY: number, el: PlacedElement) => {
+      const asset = assets?.find((a) => a.id === el.assetId);
+      if (!asset) return false;
+      if (el.id === sittingOnIdRef.current) return false;
+
+      const mode = getCollisionMode(asset);
+      if (mode === "none") return false;
+
+      let elW = asset.width * GRID_SIZE;
+      let elH = asset.height * GRID_SIZE;
+      let elLeft = el.x * GRID_SIZE;
+      let elTop = el.y * GRID_SIZE;
+
+      if (el.rotation === 90 || el.rotation === 270) {
+        const cx = elLeft + elW / 2;
+        const cy = elTop + elH / 2;
+        elW = asset.height * GRID_SIZE;
+        elH = asset.width * GRID_SIZE;
+        elLeft = cx - elW / 2;
+        elTop = cy - elH / 2;
+      }
+
+      // For "partial" collision (trees), only block at the trunk — bottom 40% of tile,
+      // centered horizontally at 50% width. This lets the avatar walk under the canopy.
+      if (mode === "partial") {
+        const trunkW = elW * 0.5;
+        const trunkH = elH * 0.4;
+        elLeft = elLeft + (elW - trunkW) / 2;
+        elTop = elTop + elH - trunkH;
+        elW = trunkW;
+        elH = trunkH;
+      }
+
+      const shrink = mode === "partial" ? 2 : 6;
+      const rect = getBodyRect(posX, posY);
+
+      return (
+        rect.left < (elLeft + elW - shrink) &&
+        rect.right > (elLeft + shrink) &&
+        rect.top < (elTop + elH - shrink) &&
+        rect.bottom > (elTop + shrink)
+      );
+    };
+
+    const loop = (now: number) => {
       const keys = keysPressed.current;
       let dx = 0;
       let dy = 0;
 
-      if (keys.has("arrowleft") || keys.has("a")) dx -= MOVE_SPEED;
-      if (keys.has("arrowright") || keys.has("d")) dx += MOVE_SPEED;
-      if (keys.has("arrowup") || keys.has("w")) dy -= MOVE_SPEED;
-      if (keys.has("arrowdown") || keys.has("s")) dy += MOVE_SPEED;
+      if (keys.has("arrowleft") || keys.has("a")) dx -= 1;
+      if (keys.has("arrowright") || keys.has("d")) dx += 1;
+      if (keys.has("arrowup") || keys.has("w")) dy -= 1;
+      if (keys.has("arrowdown") || keys.has("s")) dy += 1;
 
       const moving = dx !== 0 || dy !== 0;
-      setIsMoving(moving);
+      movingRef.current = moving;
 
       if (moving) {
-        if (dx < 0) setFacing('left');
-        else if (dx > 0) setFacing('right');
-        else if (dy < 0) setFacing('up');
-        else if (dy > 0) setFacing('down');
+        // Normalise diagonal movement so it's not ~40% faster
+        const len = Math.sqrt(dx * dx + dy * dy);
+        dx = (dx / len) * MOVE_SPEED;
+        dy = (dy / len) * MOVE_SPEED;
 
-        setAvatarPos((prev) => {
-          let newX = Math.max(0, Math.min(worldW - AVATAR_SIZE, prev.x + dx));
-          let newY = Math.max(0, Math.min(worldH - AVATAR_SIZE, prev.y + dy));
+        // Determine facing direction
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          facingRef.current = dx < 0 ? 'left' : 'right';
+        } else {
+          facingRef.current = dy < 0 ? 'up' : 'down';
+        }
 
-          const getFeetRect = (posX: number, posY: number) => {
-            const NAME_TAG_H = 20;
-            const CHAR_H = 42;
-            const feetCenterX = posX + AVATAR_SIZE / 2;
-            const feetBottomY = posY + NAME_TAG_H + CHAR_H;
-            return {
-              left: feetCenterX - 3,
-              right: feetCenterX + 3,
-              top: feetBottomY - 4,
-              bottom: feetBottomY,
-            };
-          };
+        const prev = posRef.current;
+        const minBound = -1000;
+        const maxBoundX = worldW + 1000;
+        const maxBoundY = worldH + 1000;
 
-          const isInside = (posX: number, posY: number, el: PlacedElement) => {
-            const asset = assets?.find((a) => a.id === el.assetId);
-            if (!asset || asset.category === "zone") return false;
-            if (el.id === sittingOnIdRef.current) return false;
+        let newX = Math.max(minBound, Math.min(maxBoundX - AVATAR_SIZE, prev.x + dx));
+        let newY = Math.max(minBound, Math.min(maxBoundY - AVATAR_SIZE, prev.y + dy));
 
-            let elW = asset.width * GRID_SIZE;
-            let elH = asset.height * GRID_SIZE;
-            let elLeft = el.x * GRID_SIZE;
-            let elTop = el.y * GRID_SIZE;
-
-            if (el.rotation === 90 || el.rotation === 270) {
-              const cx = elLeft + elW / 2;
-              const cy = elTop + elH / 2;
-              elW = asset.height * GRID_SIZE;
-              elH = asset.width * GRID_SIZE;
-              elLeft = cx - elW / 2;
-              elTop = cy - elH / 2;
-            }
-
-            const inset = 8;
-            const rect = getFeetRect(posX, posY);
-            
-            return (
-              rect.left < (elLeft + elW - inset) &&
-              rect.right > (elLeft + inset) &&
-              rect.top < (elTop + elH - inset) &&
-              rect.bottom > (elTop + inset)
-            );
-          };
-
-          // Find all elements we are ALREADY overlapping
-          const alreadyOverlapping = new Set<string>();
-          for (const el of placedElements) {
-            if (isInside(prev.x, prev.y, el)) {
-              alreadyOverlapping.add(el.id);
-            }
+        // Find elements we're already overlapping (allow walking out)
+        const alreadyOverlapping = new Set<string>();
+        for (const el of placedElements) {
+          if (isInside(prev.x, prev.y, el)) {
+            alreadyOverlapping.add(el.id);
           }
+        }
 
-          const checkCol = (testPosX: number, testPosY: number) => {
-            for (const el of placedElements) {
-              if (alreadyOverlapping.has(el.id)) continue; // Allow walking "out" of things we are already in
-              if (isInside(testPosX, testPosY, el)) return true;
-            }
-            return false;
-          };
+        const checkCol = (testX: number, testY: number) => {
+          for (const el of placedElements) {
+            if (alreadyOverlapping.has(el.id)) continue;
+            if (isInside(testX, testY, el)) return true;
+          }
+          return false;
+        };
 
-          // Slide along walls logic: test X and Y axes independently
-          if (dx !== 0 && checkCol(newX, prev.y)) newX = prev.x;
-          if (dy !== 0 && checkCol(newX, newY)) newY = prev.y;
+        // Slide along walls: test each axis independently
+        if (dx !== 0 && checkCol(newX, prev.y)) newX = prev.x;
+        if (dy !== 0 && checkCol(newX, newY)) newY = prev.y;
 
-          return { x: newX, y: newY };
-        });
+        posRef.current = { x: newX, y: newY };
       }
+
+      // Throttle React state sync to ~30fps to avoid excessive re-renders
+      if (now - lastSyncRef.current > 33) {
+        lastSyncRef.current = now;
+        setAvatarPos(posRef.current);
+        setFacing(facingRef.current);
+        setIsMoving(movingRef.current);
+      }
+
       animationRef.current = requestAnimationFrame(loop);
     };
     animationRef.current = requestAnimationFrame(loop);
@@ -336,15 +397,18 @@ export default function SpaceRoomPage() {
 
     setNearbyElement(closest ? { el: closest.el, asset: closest.asset, actions: closest.actions } : null);
 
+    // Use the ref to avoid avatarState in the dependency array (prevents infinite loop)
+    const currentState = avatarStateRef.current;
+
     // Auto-exit swimming when walking away from pool
-    if (avatarState === 'swimming' && (!closest || closest.actions[0]?.type !== 'SWIM')) {
+    if (currentState === 'swimming' && (!closest || closest.actions[0]?.type !== 'SWIM')) {
       setAvatarState('idle');
     }
     // Auto-enter swimming when near pool
-    if (avatarState === 'idle' && closest && closest.actions[0]?.type === 'SWIM') {
+    if (currentState === 'idle' && closest && closest.actions[0]?.type === 'SWIM') {
       setAvatarState('swimming');
     }
-  }, [avatarPos, assets, canvasData, avatarState]);
+  }, [avatarPos, assets, canvasData]);
 
   // Camera follow avatar
   useEffect(() => {
@@ -363,10 +427,15 @@ export default function SpaceRoomPage() {
         y: Math.round(targetY),
       });
     } else {
-      // In windowed mode, clamp to world boundaries to keep it clean within the page
+      // Allow the camera to follow into the expanded negative coordinate space
+      const minCamX = -1500;
+      const minCamY = -1500;
+      const maxCamX = worldW + 1500 - vw;
+      const maxCamY = worldH + 1500 - vh;
+
       setCamera({
-        x: Math.round(worldW > vw ? Math.max(0, Math.min(worldW - vw, targetX)) : (worldW - vw) / 2),
-        y: Math.round(worldH > vh ? Math.max(0, Math.min(worldH - vh, targetY)) : (worldH - vh) / 2),
+        x: Math.round(Math.max(minCamX, Math.min(maxCamX, targetX))),
+        y: Math.round(Math.max(minCamY, Math.min(maxCamY, targetY))),
       });
     }
   }, [avatarPos, worldW, worldH, isFullscreen]);
@@ -479,7 +548,7 @@ export default function SpaceRoomPage() {
                 style={{
                   left: avatarPos.x,
                   top: avatarPos.y,
-                  transition: "left 0.08s linear, top 0.08s linear",
+                  willChange: "left, top",
                 }}
               >
                 {/* Interaction Prompt */}
@@ -494,50 +563,18 @@ export default function SpaceRoomPage() {
 
                 {/* Name tag */}
                 <div className="bg-black/70 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded-full mb-1 whitespace-nowrap border border-white/10 shadow-lg z-50">
-                  Dale
+                  {user?.name.split(" ")[0] || "You"} (You)
                 </div>
 
                 {/* Character container - Gather.town style */}
-                <div 
-                  className={`relative flex flex-col items-center justify-end ${isMoving ? 'animate-gather-wobble' : ''} ${avatarState === 'sitting' ? 'avatar-sitting' : ''} ${avatarState === 'swimming' ? 'avatar-swimming' : ''}`}
-                  style={{ 
-                    width: AVATAR_SIZE, 
-                    height: avatarState === 'sitting' ? AVATAR_SIZE : AVATAR_SIZE + 10
-                  }}
-                >
-                  {/* Head */}
-                  <div className="relative w-[22px] h-[22px] bg-[#FDBCB4] rounded-[8px] border-[1.5px] border-[#E8A090] z-30 flex flex-col items-center overflow-hidden shrink-0 shadow-sm">
-                     {/* Hair */}
-                     <div className={`w-full bg-[#4A2F1D] absolute top-0 ${facing === 'up' ? 'h-full' : 'h-[8px]'} transition-all`} />
-                     
-                     {/* Face/Eyes */}
-                     {facing !== 'up' && (
-                       <div className={`w-full flex mt-[10px] z-10 ${facing === 'right' ? 'justify-end pr-[3px]' : facing === 'left' ? 'justify-start pl-[3px]' : 'justify-center gap-[3px]'}`}>
-                         <div className="w-[4px] h-[4px] bg-[#1E293B] rounded-full" />
-                         {(facing === 'down') && <div className="w-[4px] h-[4px] bg-[#1E293B] rounded-full" />}
-                       </div>
-                     )}
-                  </div>
-
-                  {/* Body Container */}
-                  <div className="relative flex justify-center w-[26px] h-[18px] mt-[-4px] z-20 shrink-0">
-                     {/* Left Arm */}
-                     <div className={`absolute left-[-2px] top-[4px] w-[6px] h-[12px] bg-[#E8A090] rounded-full z-10 origin-top shadow-sm ${isMoving ? 'animate-arm-swing-left' : ''}`} />
-                     {/* Right Arm */}
-                     <div className={`absolute right-[-2px] top-[4px] w-[6px] h-[12px] bg-[#E8A090] rounded-full z-10 origin-top shadow-sm ${isMoving ? 'animate-arm-swing-right' : ''}`} />
-
-                     {/* Torso */}
-                     <div className="w-[20px] h-[18px] bg-primary rounded-md z-20 shadow-sm" />
-
-                     {/* Legs - hidden when sitting */}
-                     {avatarState !== 'sitting' && (
-                       <>
-                         <div className={`absolute left-[4px] bottom-[-6px] w-[6px] h-[8px] bg-[#1E293B] rounded-full z-10 origin-top ${isMoving ? 'animate-leg-step-left' : ''}`} />
-                         <div className={`absolute right-[4px] bottom-[-6px] w-[6px] h-[8px] bg-[#1E293B] rounded-full z-10 origin-top ${isMoving ? 'animate-leg-step-right' : ''}`} />
-                       </>
-                     )}
-                  </div>
-                </div>
+                <AvatarCharacter
+                  config={avatarConfig}
+                  size="sm"
+                  isMoving={isMoving}
+                  facing={facing}
+                  state={avatarState}
+                  showShadow={false}
+                />
 
                 {/* Shadow */}
                 <div className={`w-7 h-2 bg-black/30 rounded-full blur-[2px] mt-1 z-10 ${isMoving ? 'animate-shadow-squish' : ''}`} />

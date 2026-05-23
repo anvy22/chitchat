@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    // ── Output ───────────────────────────────────────────────────────────
+    "target": "ES2022",
+    "module": "CommonJS",           // Node.js native — no ESM interop headaches
+    "moduleResolution": "Node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    // ── Strictness ───────────────────────────────────────────────────────
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // ── DX ───────────────────────────────────────────────────────────────
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // ── Path aliases ─────────────────────────────────────────────────────
+    // "@/*"  →  src/*   (e.g.  import { jwt } from '@/lib/jwt')
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

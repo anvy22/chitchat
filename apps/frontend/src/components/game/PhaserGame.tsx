@@ -86,7 +86,7 @@ export function PhaserGame() {
         this.physics.add.collider(player, desks);
 
         // Name tag
-        const nameText = this.add.text(0, -30, 'Dale', {
+        const nameText = this.add.text(0, -30, 'Dale (You)', {
           fontSize: '12px',
           color: '#0F172A',
           backgroundColor: 'rgba(255,255,255,0.8)',
