@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import config from '@/config';
 import { responseHandler } from '@/middlewares/responseHandler';
 import { errorHandler } from '@/middlewares/errorHandler';
+import userRouter from '@/modules/users/route';
 
 import healthRoutes from '@/modules/health/route';
 import authRouter from '@/modules/auth/route';
@@ -24,6 +25,7 @@ app.use(cookieParser());
 //routes
 app.use('/health', healthRoutes);
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/users', userRouter)
 
 
 

@@ -44,7 +44,11 @@ apiClient.interceptors.response.use(
           { withCredentials: true }
         );
 
-        const newAccessToken = response.data.data.accessToken;
+        const newAccessToken = response.data?.data?.accessToken;
+
+        if (!newAccessToken || typeof newAccessToken !== 'string') {
+          throw new Error('Invalid refresh response: missing accessToken');
+        }
         
         // Update in-memory token
         setAccessToken(newAccessToken);
