@@ -58,11 +58,16 @@ export const authService = {
       workspaceId = newWs.id;
 
       // Add as owner
-      await supabase.from("workspace_members").insert({
+      const {error:memberError} = await supabase.from("workspace_members").insert({
         workspace_id: workspaceId,
         user_id: userId,
         role: "owner",
       });
+      
+      if (memberError) {
+        throw new AppError("Failed to create workspace membership", 500);
+      }
+
     } else {
       const firstMember = workspaceMembers[0];
       if (!firstMember?.workspace_id) {
@@ -93,10 +98,8 @@ export const authService = {
   async refresh(refreshToken: string) {
     const redis = getRedisClient();
 
-    let decoded;
-    try {
-      decoded = verifyRefreshToken(refreshToken);
-    } catch {
+    const decoded = verifyRefreshToken(refreshToken);
+    if (!decoded) {
       throw new AppError("Invalid or expired refresh token", 401);
     }
 

@@ -27,22 +27,26 @@ export const authenticate = async (req: Request, _res: Response, next: NextFunct
     throw new AppError("Token missing from Authorization header", 401);
   }
 
-  try {
-    const decoded = verifyAccessToken(token);
+  const decoded = verifyAccessToken(token);
 
-    // Check if token's jti is in the blocklist (from a previous logout)
-    const redis = getRedisClient();
-    const isBlocklisted = await redis.get(`${REDIS_BLOCKLIST_PREFIX}${decoded.jti}`);
-    
-    if (isBlocklisted) {
-      throw new AppError("Session revoked", 401);
-    }
-
-    // Inject into request
-    req.user = decoded;
-    next();
-  } catch (error) {
-    if (error instanceof AppError) throw error;
+  if (!decoded) {
     throw new AppError("Invalid or expired access token", 401);
   }
+
+  // Check if token's jti is in the blocklist (from a previous logout)
+  const redis = getRedisClient();
+  let isBlocklisted;
+  try {
+    isBlocklisted = await redis.get(`${REDIS_BLOCKLIST_PREFIX}${decoded.jti}`);
+  } catch (error) {
+    throw new AppError("Service unavailable: session verification failed", 503);
+  }
+  
+  if (isBlocklisted) {
+    throw new AppError("Session revoked", 401);
+  }
+
+  // Inject into request
+  req.user = decoded;
+  next();
 };

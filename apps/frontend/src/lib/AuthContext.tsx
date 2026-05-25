@@ -43,10 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const newAccessToken = response.data.data.accessToken;
           setAccessToken(newAccessToken);
           
-          // Decode the JWT to get user info, or make a separate /me request
-          // For now, we'll parse the JWT payload (base64)
           try {
-            const payload = JSON.parse(atob(newAccessToken.split('.')[1]));
+            const base64Url = newAccessToken.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const paddedBase64 = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+            const payload = JSON.parse(atob(paddedBase64));
             setUser({
               id: payload.sub,
               email: payload.email,
@@ -82,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       window.removeEventListener('auth:unauthorized', handleUnauthorized);
     };
-  }, [pathname, router]);
+  }, []);
 
   const login = (token: string, userData: User) => {
     setAccessToken(token);

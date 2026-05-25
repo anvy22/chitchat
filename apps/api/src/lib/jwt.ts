@@ -39,11 +39,21 @@ export const signTokens = (payload: Omit<JwtPayload, 'jti' | 'iat' | 'exp'>) => 
 };
 
 
-export const verifyAccessToken = (token: string): JwtPayload => {
-  return jwt.verify(token, config.jwt.secret) as JwtPayload;
+export const verifyAccessToken = (token: string): JwtPayload | null => {
+  try {
+    return jwt.verify(token, config.jwt.secret) as JwtPayload;
+  } catch (error) {
+    logger.error(`Access token verification failed: ${error instanceof Error ? error.message : error}`);
+    return null;
+  }
 };
 
 
-export const verifyRefreshToken = (token: string): JwtPayload => {
-  return jwt.verify(token, config.jwt.refreshSecret) as JwtPayload;
+export const verifyRefreshToken = (token: string): JwtPayload | null => {
+  try {
+    return jwt.verify(token, config.jwt.refreshSecret) as JwtPayload;
+  } catch (error) {
+    logger.error(`Refresh token verification failed: ${error instanceof Error ? error.message : error}`);
+    return null;
+  }
 };
